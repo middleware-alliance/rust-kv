@@ -1,8 +1,8 @@
-use std::collections::BTreeMap;
-use std::sync::Arc;
-use parking_lot::RwLock;
 use crate::data::log_record::LogRecordPos;
 use crate::index::Indexer;
+use parking_lot::RwLock;
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 // BTree is a wrapper around BTreeMap<Vec<u8>, LogRecordPos>
 pub struct BTree {
@@ -49,7 +49,6 @@ impl Indexer for BTree {
 mod tests {
     use super::*;
 
-
     #[test]
     fn test_btree_put_get_delete() {
         let btree = BTree::new();
@@ -85,24 +84,46 @@ mod tests {
         assert_eq!(btree.get(key3.clone()), Some(pos4.clone()));
     }
 
-
     #[test]
     fn test_btree_put() {
         let btree = BTree::new();
-        let res1 = btree.put("".as_bytes().to_vec(), LogRecordPos { file_id: 1, offset: 2 });
+        let res1 = btree.put(
+            "".as_bytes().to_vec(),
+            LogRecordPos {
+                file_id: 1,
+                offset: 2,
+            },
+        );
         assert_eq!(res1, true);
-        let res2 = btree.put("a".as_bytes().to_vec(), LogRecordPos { file_id: 3, offset: 4 });
+        let res2 = btree.put(
+            "a".as_bytes().to_vec(),
+            LogRecordPos {
+                file_id: 3,
+                offset: 4,
+            },
+        );
         assert_eq!(res2, true);
     }
 
     #[test]
     fn test_btree_get() {
         let btree = BTree::new();
-        let res1 = btree.put("".as_bytes().to_vec(), LogRecordPos { file_id: 1, offset: 2 });
+        let res1 = btree.put(
+            "".as_bytes().to_vec(),
+            LogRecordPos {
+                file_id: 1,
+                offset: 2,
+            },
+        );
         assert_eq!(res1, true);
-        let res2 = btree.put("a".as_bytes().to_vec(), LogRecordPos { file_id: 3, offset: 4 });
+        let res2 = btree.put(
+            "a".as_bytes().to_vec(),
+            LogRecordPos {
+                file_id: 3,
+                offset: 4,
+            },
+        );
         assert_eq!(res2, true);
-
 
         let pos1 = btree.get("".as_bytes().to_vec());
         assert!(pos1.is_some());
@@ -121,9 +142,21 @@ mod tests {
     #[test]
     fn test_btree_delete() {
         let btree = BTree::new();
-        let res1 = btree.put("".as_bytes().to_vec(), LogRecordPos { file_id: 1, offset: 2 });
+        let res1 = btree.put(
+            "".as_bytes().to_vec(),
+            LogRecordPos {
+                file_id: 1,
+                offset: 2,
+            },
+        );
         assert_eq!(res1, true);
-        let res2 = btree.put("a".as_bytes().to_vec(), LogRecordPos { file_id: 3, offset: 4 });
+        let res2 = btree.put(
+            "a".as_bytes().to_vec(),
+            LogRecordPos {
+                file_id: 3,
+                offset: 4,
+            },
+        );
         assert_eq!(res2, true);
 
         let res3 = btree.delete("".as_bytes().to_vec());
