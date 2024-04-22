@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum Errors {
     #[error("failed to read from data file")]
     FailedReadFromDataFile,
@@ -25,6 +25,24 @@ pub enum Errors {
 
     #[error("data file not found")]
     DataFileNotFound,
+
+    #[error("directory path can not be empty")]
+    DirPathIsEmpty,
+
+    #[error("data file size is too small")]
+    DataFileSizeTooSmall,
+
+    #[error("failed to create database directory")]
+    FailedToCreateDatabaseDir,
+
+    #[error("failed to read database directory")]
+    FailedToReadDatabaseDir,
+
+    #[error("failed to write to database directory")]
+    DataDirectoryCorrupted,
+
+    #[error("failed to read from data file: EOF")]
+    ReadDataFileEOF,
 }
 
 pub type Result<T> = std::result::Result<T, Errors>;

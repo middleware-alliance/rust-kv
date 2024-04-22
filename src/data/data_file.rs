@@ -1,9 +1,13 @@
-use crate::data::log_record::LogRecord;
-use crate::errors::Result;
-use crate::fio;
-use parking_lot::RwLock;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use parking_lot::RwLock;
+
+use crate::data::log_record::ReadLogRecord;
+use crate::errors::Result;
+use crate::fio;
+
+pub const DATA_FILE_NAME_SUFFIX: &str = ".data";
 
 pub struct DataFile {
     file_id: Arc<RwLock<u32>>, // file_id is a shared variable that is accessed by multiple threads
@@ -21,12 +25,17 @@ impl DataFile {
         *read_guard
     }
 
+    pub fn set_write_off(&self, off: u64) {
+        let mut write_guard = self.write_off.write();
+        *write_guard = off;
+    }
+
     pub fn get_file_id(&self) -> u32 {
         let read_guard = self.file_id.read();
         *read_guard
     }
 
-    pub fn read_log_record(&self, offset: u64) -> Result<LogRecord> {
+    pub fn read_log_record(&self, offset: u64) -> Result<ReadLogRecord> {
         todo!()
     }
 

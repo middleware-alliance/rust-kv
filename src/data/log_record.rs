@@ -24,3 +24,9 @@ pub struct LogRecordPos {
     pub(crate) file_id: u32,
     pub(crate) offset: u64,
 }
+
+// ReadLogRecord represents a log record that has been read from a log file.
+pub struct ReadLogRecord {
+    pub(crate) record: LogRecord,
+    pub(crate) size: u64,
+}
