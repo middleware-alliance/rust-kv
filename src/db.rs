@@ -112,6 +112,39 @@ impl Engine {
         Ok(())
     }
 
+    /// delete a key
+    pub fn delete(&self, key: Bytes) -> Result<()> {
+        // key is empty, return error
+        if key.is_empty() {
+            return Err(Errors::KeyIsEmpty);
+        }
+
+        // key existence check
+        let pos = self.index.get(key.to_vec());
+        if pos.is_none() {
+            return Ok(());
+        }
+
+
+        // create a log record
+        let mut log_record = LogRecord {
+            key: key.to_vec(),
+            value: Default::default(),
+            rec_type: DELETED,
+        };
+
+        // append the log record to the active log file
+        self.append_log_record(&mut log_record)?;
+
+        // update the memory index
+        let ok = self.index.delete(key.to_vec());
+        if !ok {
+            return Err(Errors::IndexUpdateFailed);
+        }
+
+        Ok(())
+    }
+
     /// append a log record to the active log file
     fn append_log_record(&self, log_record: &mut LogRecord) -> Result<LogRecordPos> {
         let dir_path = self.options.dir_path.clone();
