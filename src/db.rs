@@ -302,10 +302,13 @@ impl Engine {
                     offset,
                 };
 
-                match log_record.rec_type {
+                let ok = match log_record.rec_type {
                     NORMAL => self.index.put(log_record.key.to_vec(), log_record_pos),
                     DELETED => self.index.delete(log_record.key.to_vec()),
                 };
+                if !ok {
+                    return Err(Errors::IndexUpdateFailed);
+                }
 
                 // update the offset
                 offset += size;
