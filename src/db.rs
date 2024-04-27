@@ -1,15 +1,15 @@
 use crate::data::log_record::LogRecordType::{DELETED, NORMAL};
 use crate::data::log_record::{LogRecord, LogRecordPos};
 use bytes::Bytes;
+use log::warn;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::ptr::read;
 use std::sync::Arc;
-use log::warn;
 
-use crate::data::data_file::{DATA_FILE_NAME_SUFFIX, DataFile};
+use crate::data::data_file::{DataFile, DATA_FILE_NAME_SUFFIX};
 use crate::errors::{Errors, Result};
 use crate::index;
 use crate::options::Options;
@@ -124,7 +124,6 @@ impl Engine {
         if pos.is_none() {
             return Ok(());
         }
-
 
         // create a log record
         let mut log_record = LogRecord {
@@ -244,7 +243,10 @@ impl Engine {
                 if older_file.is_none() {
                     return Err(Errors::DataFileNotFound);
                 }
-                older_file.unwrap().read_log_record(log_record_pos.offset)?.record
+                older_file
+                    .unwrap()
+                    .read_log_record(log_record_pos.offset)?
+                    .record
             }
         };
 
@@ -281,9 +283,8 @@ impl Engine {
                             return Err(Errors::DataFileNotFound);
                         }*/
                         older_file.read_log_record(offset)
-                    },
+                    }
                 };
-
 
                 let (log_record, size) = match log_record_res {
                     Ok(result) => (result.record, result.size),
@@ -293,7 +294,7 @@ impl Engine {
                         }
 
                         return Err(e);
-                    },
+                    }
                 };
 
                 // create memory index

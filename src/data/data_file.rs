@@ -1,11 +1,13 @@
+use bytes::{Buf, BytesMut};
 use std::path::PathBuf;
 use std::sync::Arc;
-use bytes::{Buf, BytesMut};
 
 use parking_lot::RwLock;
 use prost::{decode_length_delimiter, length_delimiter_len};
 
-use crate::data::log_record::{LogRecord, LogRecordType, max_log_record_header_size, ReadLogRecord};
+use crate::data::log_record::{
+    max_log_record_header_size, LogRecord, LogRecordType, ReadLogRecord,
+};
 use crate::errors::{Errors, Result};
 use crate::fio;
 use crate::fio::new_io_manager;
@@ -26,13 +28,11 @@ impl DataFile {
         // init io manager
         let io_manager = new_io_manager(file_name)?;
 
-        Ok(
-            DataFile {
-                file_id: Arc::new(RwLock::new(file_id)),
-                write_off: Arc::new(RwLock::new(0)),
-                io_manager: Box::new(io_manager),
-            }
-        )
+        Ok(DataFile {
+            file_id: Arc::new(RwLock::new(file_id)),
+            write_off: Arc::new(RwLock::new(0)),
+            io_manager: Box::new(io_manager),
+        })
     }
 
     pub fn get_write_off(&self) -> u64 {
@@ -71,12 +71,14 @@ impl DataFile {
 
         // type key_size value_size
         // get actual header size
-        let actual_header_size = length_delimiter_len(key_size) + length_delimiter_len(value_size) + 1;
+        let actual_header_size =
+            length_delimiter_len(key_size) + length_delimiter_len(value_size) + 1;
         // get actual payload size
         let actual_payload_size = key_size + value_size;
         // body crc32
         let mut kv_buf = BytesMut::zeroed(actual_payload_size + 4);
-        self.io_manager.read(&mut kv_buf, offset + actual_header_size as u64)?;
+        self.io_manager
+            .read(&mut kv_buf, offset + actual_header_size as u64)?;
 
         // parse key and value
         let mut log_record = LogRecord {
@@ -125,7 +127,7 @@ mod tests {
 
     #[test]
     fn test_new_data_file() {
-        let dir_path= std::env::temp_dir();
+        let dir_path = std::env::temp_dir();
         let data_file_res = DataFile::new(dir_path.clone(), 0);
         assert!(data_file_res.is_ok());
 
@@ -138,7 +140,6 @@ mod tests {
         let data_file_res = DataFile::new(dir_path.clone(), 0);
         assert!(data_file_res.is_ok());
 
-
         // again with different file_id
         let data_file_res = DataFile::new(dir_path.clone(), 1);
         assert!(data_file_res.is_ok());
@@ -149,10 +150,9 @@ mod tests {
 
     #[test]
     fn test_data_file_write() {
-        let dir_path= std::env::temp_dir();
+        let dir_path = std::env::temp_dir();
         let data_file_res = DataFile::new(dir_path.clone(), 0);
         assert!(data_file_res.is_ok());
-
 
         let data_file = data_file_res.unwrap();
         let data = b"hello world";
@@ -166,13 +166,11 @@ mod tests {
 
     #[test]
     fn test_data_file_sync() {
-        let dir_path= std::env::temp_dir();
+        let dir_path = std::env::temp_dir();
         let data_file_res = DataFile::new(dir_path.clone(), 0);
         assert!(data_file_res.is_ok());
-
 
         let data_file = data_file_res.unwrap();
         data_file.sync().unwrap();
     }
-
 }
