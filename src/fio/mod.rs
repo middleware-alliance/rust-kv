@@ -1,6 +1,8 @@
 mod file_io;
 
+use std::path::PathBuf;
 use crate::errors::Result;
+use crate::fio::file_io::FileIO;
 
 /// IOManager is an interface for managing I/O operations.
 pub trait IOManager: Send + Sync {
@@ -13,4 +15,9 @@ pub trait IOManager: Send + Sync {
     /// Synchronize the device's internal cache with the underlying storage.
     /// This ensures that data written to the device is immediately available for reading.
     fn sync(&self) -> Result<()>;
+}
+
+/// Create a new IOManager for the given file name.
+pub fn new_io_manager(file_name: PathBuf) -> Result<impl IOManager> {
+    FileIO::new(file_name)
 }

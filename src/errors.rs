@@ -43,6 +43,9 @@ pub enum Errors {
 
     #[error("failed to read from data file: EOF")]
     ReadDataFileEOF,
+
+    #[error("invalid crc value, log record may be corrupted")]
+    InvalidLogRecordCrc,
 }
 
 pub type Result<T> = std::result::Result<T, Errors>;

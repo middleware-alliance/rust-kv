@@ -311,7 +311,7 @@ impl Engine {
                 }
 
                 // update the offset
-                offset += size;
+                offset += size as u64;
             }
 
             // set the active file id
