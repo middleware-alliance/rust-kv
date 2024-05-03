@@ -81,7 +81,7 @@ impl DataFile {
             .read(&mut kv_buf, offset + actual_header_size as u64)?;
 
         // parse key and value
-        let mut log_record = LogRecord {
+        let log_record = LogRecord {
             key: kv_buf.get(..key_size).unwrap().to_vec(),
             value: kv_buf.get(key_size..kv_buf.len() - 4).unwrap().to_vec(),
             rec_type: LogRecordType::from_u8(rec_type),
@@ -172,5 +172,73 @@ mod tests {
 
         let data_file = data_file_res.unwrap();
         data_file.sync().unwrap();
+    }
+
+    #[test]
+    fn test_data_file_read_log_record() {
+        let dir_path = std::env::temp_dir();
+        // remove existing data file
+        let file_name = get_data_file_path(dir_path.clone(), 100);
+        if file_name.exists() {
+            std::fs::remove_file(file_name).unwrap();
+        }
+        let data_file_res = DataFile::new(dir_path.clone(), 100);
+
+        assert!(data_file_res.is_ok());
+        let data_file = data_file_res.unwrap();
+        assert_eq!(data_file.get_file_id(), 100);
+
+        let enc = LogRecord {
+            key: "name".as_bytes().to_vec(),
+            value: "bitcask-rs-kv".as_bytes().to_vec(),
+            rec_type: LogRecordType::NORMAL,
+        };
+        let write_result = data_file.write(&enc.encode());
+        assert!(write_result.is_ok());
+
+        // read log record from offset 0
+        let read_result = data_file.read_log_record(0);
+        assert!(read_result.is_ok());
+        let read_log_record = read_result.unwrap();
+        assert_eq!(read_log_record.record.key, enc.key);
+        assert_eq!(read_log_record.record.value, enc.value);
+        assert_eq!(read_log_record.record.rec_type, enc.rec_type);
+        assert_eq!(read_log_record.size, 24);
+
+        // read log record from offset 24
+        let enc = LogRecord {
+            key: "name".as_bytes().to_vec(),
+            value: "new value".as_bytes().to_vec(),
+            rec_type: LogRecordType::NORMAL,
+        };
+        let write_result = data_file.write(&enc.encode());
+        assert!(write_result.is_ok());
+
+        // read log record from offset 0
+        let read_result = data_file.read_log_record(24);
+        assert!(read_result.is_ok());
+        let read_log_record = read_result.unwrap();
+        assert_eq!(read_log_record.record.key, enc.key);
+        assert_eq!(read_log_record.record.value, enc.value);
+        assert_eq!(read_log_record.record.rec_type, enc.rec_type);
+        assert_eq!(read_log_record.size, 20);
+
+        // delete type
+        let enc = LogRecord {
+            key: "name".as_bytes().to_vec(),
+            value: Default::default(),
+            rec_type: LogRecordType::DELETED,
+        };
+        let write_result = data_file.write(&enc.encode());
+        assert!(write_result.is_ok());
+
+        // read log record from offset 44
+        let read_result = data_file.read_log_record(44);
+        assert!(read_result.is_ok());
+        let read_log_record = read_result.unwrap();
+        assert_eq!(read_log_record.record.key, enc.key);
+        assert_eq!(read_log_record.record.value, enc.value);
+        assert_eq!(read_log_record.record.rec_type, enc.rec_type);
+        assert_eq!(read_log_record.size, 11);
     }
 }

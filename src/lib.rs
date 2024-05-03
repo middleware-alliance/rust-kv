@@ -1,7 +1,9 @@
 // cargo-fmt --all
 mod data;
-mod db;
+pub mod db;
 mod errors;
 mod fio;
 mod index;
-mod options;
+pub mod options;
+mod util;
+mod db_tests;

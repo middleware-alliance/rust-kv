@@ -20,3 +20,15 @@ pub enum IndexType {
     // skip  table index
     SkipList,
 }
+
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            dir_path: std::env::temp_dir().join("bitcask-rs"),
+            data_file_size: 256 *1024 * 1024,
+            sync_writes: false,
+            index_type: IndexType::BTree,
+        }
+    }
+}

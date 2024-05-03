@@ -66,6 +66,8 @@ impl Engine {
             }
         }
 
+        // reverse the data files to get the latest one as the active data file
+        data_files.reverse();
         // get the active data file
         let active_file = match data_files.pop() {
             None => DataFile::new(dir_path.clone(), INITIAL_FILE_ID)?,
