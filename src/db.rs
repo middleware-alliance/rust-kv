@@ -57,6 +57,8 @@ impl Engine {
             file_ids.push(data_file.get_file_id());
         }
 
+        // reverse the data files to get the latest one as the active data file
+        data_files.reverse();
         // set old file ids for the data files
         let mut older_files = HashMap::new();
         if data_files.len() > 1 {
@@ -66,8 +68,6 @@ impl Engine {
             }
         }
 
-        // reverse the data files to get the latest one as the active data file
-        data_files.reverse();
         // get the active data file
         let active_file = match data_files.pop() {
             None => DataFile::new(dir_path.clone(), INITIAL_FILE_ID)?,
@@ -158,7 +158,7 @@ impl Engine {
         let mut active_file = self.active_file.write();
 
         // check if the active data file is full
-        if active_file.get_write_off() + record_len > active_file.get_write_off() {
+        if active_file.get_write_off() + record_len > self.options.data_file_size {
             // Persistence is required, create a new data file and move the active data file to the older files
             active_file.sync()?;
 

@@ -12,7 +12,7 @@ use crate::{
 fn test_engine_put() {
     let mut opts = Options::default();
     opts.dir_path = PathBuf::from("/tmp/bitcask-rs-put");
-    opts.data_file_size = 64 * 1024 * 1024;
+    opts.data_file_size = 32 * 1024 * 1024;
     let engine = Engine::open(opts.clone()).expect("failed to open engine");
 
     // 1.正常 Put 一条数据
@@ -44,6 +44,7 @@ fn test_engine_put() {
     // 5.写到数据文件进行了转换
     for i in 0..=1000000 {
         let res = engine.put(get_test_key(i), get_test_value(i));
+        println!("i = {}", i);
         assert!(res.is_ok());
     }
 
@@ -98,6 +99,7 @@ fn test_engine_get() {
     // 5.转换为了旧的数据文件，从旧的数据文件上获取 value
     for i in 500..=1000000 {
         let res = engine.put(get_test_key(i), get_test_value(i));
+        println!("i = {}", i);
         assert!(res.is_ok());
     }
     let res10 = engine.get(get_test_key(505));
