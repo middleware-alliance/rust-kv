@@ -7,3 +7,4 @@ mod index;
 pub mod options;
 mod util;
 mod db_tests;
+mod iterator;

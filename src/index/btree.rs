@@ -1,8 +1,11 @@
 use crate::data::log_record::LogRecordPos;
-use crate::index::Indexer;
+use crate::index::{IndexIterator, Indexer};
+use crate::options::IteratorOptions;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use bytes::Bytes;
+use crate::errors::Result;
 
 // BTree is a wrapper around BTreeMap<Vec<u8>, LogRecordPos>
 pub struct BTree {
@@ -41,12 +44,95 @@ impl Indexer for BTree {
         let remove_res = with_write_guard.remove(&key);
         remove_res.is_some()
     }
+
+    // list_keys returns a list of all keys in the BTree
+    fn list_keys(&self) -> Result<Vec<Bytes>> {
+        let read_guard = self.tree.read();
+        let mut keys = Vec::with_capacity(read_guard.len());
+        for (k, _) in read_guard.iter() {
+            keys.push(Bytes::copy_from_slice(&k));
+        }
+        Ok(keys)
+    }
+
+    fn iterator(&self, options: IteratorOptions) -> Box<dyn IndexIterator> {
+        let read_guard = self.tree.read();
+        let mut items = Vec::with_capacity(read_guard.len());
+        // load btree items into a vector
+        for (key, value) in read_guard.iter() {
+            items.push((key.clone(), value.clone()));
+        }
+        if options.reverse {
+            items.reverse();
+        }
+        Box::new(BTreeIterator {
+            items,
+            curr_index: 0,
+            options,
+        })
+    }
+}
+
+/// BTreeIterator is an iterator over the key-value pairs in the BTree
+pub struct BTreeIterator {
+    items: Vec<(Vec<u8>, LogRecordPos)>, // store the key-value pairs in a vector
+    curr_index: usize,                   // the current index of the vector
+    options: IteratorOptions,            // the options for the iterator
+}
+
+impl IndexIterator for BTreeIterator {
+    /// rewind resets the iterator to the beginning of the key-value pairs
+    fn rewind(&mut self) {
+        self.curr_index = 0;
+    }
+
+    /// seek moves the iterator to the position of the first key-value pair whose key is greater than or equal to the given key
+    fn seek(&mut self, key: Vec<u8>) {
+        /*self.curr_index = match self.items.binary_search_by(|(x, _)| {
+            if self.options.reverse {
+                x.cmp(&key).reverse()
+            } else {
+                x.cmp(&key)
+            }
+        }) {
+            Ok(equal_val) => equal_val,
+            Err(insert_val) => insert_val,
+        };*/
+        self.curr_index = self
+            .items
+            .binary_search_by(|(x, _)| {
+                if self.options.reverse {
+                    x.cmp(&key).reverse()
+                } else {
+                    x.cmp(&key)
+                }
+            })
+            .unwrap_or_else(|insert_val| insert_val);
+    }
+
+    /// next returns the next key-value pair in the iterator
+    fn next(&mut self) -> Option<(&Vec<u8>, &LogRecordPos)> {
+        if self.curr_index >= self.items.len() {
+            return None;
+        }
+
+        while let Some(item) = self.items.get(self.curr_index) {
+            self.curr_index += 1;
+            let prefix = &self.options.prefix;
+            if prefix.is_empty() || item.0.starts_with(prefix) {
+                return Some((&item.0, &item.1));
+            }
+        }
+
+        None
+    }
 }
 
 // tests
 // cargo test --lib index
 #[cfg(test)]
 mod tests {
+    use std::str::from_utf8;
     use super::*;
 
     #[test]
@@ -173,5 +259,98 @@ mod tests {
         let res4 = btree.delete("b".as_bytes().to_vec());
         assert!(!res4);
         assert_eq!(res4, false);
+    }
+
+    #[test]
+    fn test_btree_iterator_seek() {
+        let btree = BTree::new();
+
+        // no data
+        let mut iter = btree.iterator(IteratorOptions::default());
+        iter.seek("key1".as_bytes().to_vec());
+        let result = iter.next();
+        assert!(result.is_none());
+
+        // one data
+        btree.put("ccde".as_bytes().to_vec(), LogRecordPos { file_id: 1, offset: 10 });
+        let mut iter = btree.iterator(IteratorOptions::default());
+        iter.seek("aa".as_bytes().to_vec());
+        let result = iter.next();
+        assert!(result.is_some());
+
+        let mut iter = btree.iterator(IteratorOptions::default());
+        iter.seek("zz".as_bytes().to_vec());
+        let result = iter.next();
+        assert!(result.is_none());
+
+        // multiple data
+        btree.put("bbcd".as_bytes().to_vec(), LogRecordPos { file_id: 2, offset: 20 });
+        btree.put("abce".as_bytes().to_vec(), LogRecordPos { file_id: 3, offset: 30 });
+        btree.put("cbcf".as_bytes().to_vec(), LogRecordPos { file_id: 4, offset: 40 });
+        let mut iter = btree.iterator(IteratorOptions::default());
+        iter.seek("b".as_bytes().to_vec());
+        while let Some (item) = iter.next() {
+            println!("{:?}", String::from_utf8(item.0.to_vec()));
+            assert!(item.0.len() > 0);
+        }
+
+        let mut iter = btree.iterator(IteratorOptions::default());
+        iter.seek("cbcf".as_bytes().to_vec());
+        while let Some (item) = iter.next() {
+            println!("cbcf: {:?}", String::from_utf8(item.0.to_vec()));
+            assert!(item.0.len() > 0);
+        }
+
+        let mut iter = btree.iterator(IteratorOptions::default());
+        iter.seek("zz".as_bytes().to_vec());
+        let item = iter.next();
+        assert!(item.is_none());
+
+        // reverse
+        let mut iter = btree.iterator(IteratorOptions { reverse: true, ..IteratorOptions::default() });
+        iter.seek("bb".as_bytes().to_vec());
+        while let Some (item) = iter.next() {
+            println!("bb: {:?}", String::from_utf8(item.0.to_vec()));
+            assert!(item.0.len() > 0);
+        }
+    }
+
+    #[test]
+    fn test_btree_iterator_next() {
+        let btree = BTree::new();
+
+        // no data
+        let mut iter = btree.iterator(IteratorOptions::default());
+        let result = iter.next();
+        assert!(result.is_none());
+
+        // one data
+        btree.put("ccde".as_bytes().to_vec(), LogRecordPos { file_id: 1, offset: 10 });
+        let mut options = IteratorOptions::default();
+        options.reverse = true;
+        let mut iter = btree.iterator(options);
+        let result = iter.next();
+        assert!(result.is_some());
+
+        // multiple data
+        btree.put("bbcd".as_bytes().to_vec(), LogRecordPos { file_id: 2, offset: 20 });
+        btree.put("abce".as_bytes().to_vec(), LogRecordPos { file_id: 3, offset: 30 });
+        btree.put("cbcf".as_bytes().to_vec(), LogRecordPos { file_id: 4, offset: 40 });
+        let mut options = IteratorOptions::default();
+        options.reverse = true;
+        let mut iter = btree.iterator(options);
+        while let Some (item) = iter.next() {
+            println!("multiple: {:?}", String::from_utf8(item.0.to_vec()));
+            assert!(item.0.len() > 0);
+        }
+
+        // prefix
+        let mut options = IteratorOptions::default();
+        options.prefix = "c".as_bytes().to_vec();
+        let mut iter = btree.iterator(options);
+        while let Some (item) = iter.next() {
+            println!("prefix: {:?}", String::from_utf8(item.0.to_vec()));
+            assert!(item.0.len() > 0);
+        }
     }
 }

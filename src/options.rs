@@ -32,3 +32,18 @@ impl Default for Options {
         }
     }
 }
+
+/// Iterator options for scanning the database.
+pub struct IteratorOptions {
+    pub prefix: Vec<u8>,
+    pub reverse: bool,
+}
+
+impl Default for IteratorOptions {
+    fn default() -> Self {
+        Self {
+            prefix: Default::default(),
+            reverse: false,
+        }
+    }
+}

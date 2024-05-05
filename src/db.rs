@@ -18,15 +18,15 @@ const INITIAL_FILE_ID: u32 = 0;
 
 /// This is the engine struct, engine is responsible for managing the database.
 pub struct Engine {
-    options: Arc<Options>,
+    pub(crate) options: Arc<Options>,
     // current active data file
-    active_file: Arc<RwLock<DataFile>>,
+    pub(crate) active_file: Arc<RwLock<DataFile>>,
     // older data files
-    older_files: Arc<RwLock<HashMap<u32, DataFile>>>,
+    pub(crate) older_files: Arc<RwLock<HashMap<u32, DataFile>>>,
     // memory index
-    index: Box<dyn index::Indexer>,
+    pub(crate) index: Box<dyn index::Indexer>,
     // created by loadDataFiles(), only used for loadIndexFromDataFiles(), not used in other methods
-    load_data_file_ids: Vec<u32>,
+    pub(crate) load_data_file_ids: Vec<u32>,
 }
 
 impl Engine {
@@ -231,8 +231,50 @@ impl Engine {
             return Err(Errors::KeyNotFound);
         }
 
+        /*// get the log record position from the memory index
+        let log_record_pos = self.index.get(key.to_vec());
+
+        // if the log record position is None, return None
+        if log_record_pos.is_none() {
+            return Err(Errors::KeyNotFound);
+        }
+
         // from here, we have the log record position, we need to get the value from the data file
         let log_record_pos = log_record_pos.unwrap();
+        // get the log record from the active data file
+        let active_file = self.active_file.read();
+        let older_files = self.older_files.read();
+
+        let log_record = match active_file.get_file_id() == log_record_pos.file_id {
+            true => active_file.read_log_record(log_record_pos.offset)?.record,
+            false => {
+                let older_file = older_files.get(&log_record_pos.file_id);
+                // if the older file is not found, return error
+                if older_file.is_none() {
+                    return Err(Errors::DataFileNotFound);
+                }
+                older_file
+                    .unwrap()
+                    .read_log_record(log_record_pos.offset)?
+                    .record
+            }
+        };
+
+        // check if the log record is deleted
+        if log_record.rec_type == DELETED {
+            return Err(Errors::KeyNotFound);
+        }
+
+        // return the value
+        Ok(log_record.value.into())*/
+        // from here, we have the log record position, we need to get the value from the data file
+        let log_record_pos = log_record_pos.unwrap();
+        // get the log record from the active data file
+        self.get_value_by_position(&log_record_pos)
+    }
+
+    /// get the value of a key by log record position
+    pub(crate) fn get_value_by_position(&self, log_record_pos: &LogRecordPos) -> Result<Bytes> {
         // get the log record from the active data file
         let active_file = self.active_file.read();
         let older_files = self.older_files.read();
@@ -324,6 +366,20 @@ impl Engine {
         }
 
         Ok(())
+    }
+
+    /// close the engine and sync the active data file
+    pub fn close(&self) -> Result<()> {
+        // sync the active data file
+        let active_file = self.active_file.read();
+        active_file.sync()
+    }
+
+    /// sync the active data file
+    pub fn sync(&self) -> Result<()> {
+        // sync the active data file
+        let active_file = self.active_file.read();
+        active_file.sync()
     }
 }
 

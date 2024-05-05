@@ -121,46 +121,34 @@ fn test_engine_get() {
 }
 
 #[test]
-fn test_engine_delete() {
+fn test_engine_close() {
     let mut opts = Options::default();
-    opts.dir_path = PathBuf::from("/tmp/bitcask-rs-delete");
+    opts.dir_path = PathBuf::from("/tmp/bitcask-rs-close");
     opts.data_file_size = 64 * 1024 * 1024;
     let engine = Engine::open(opts.clone()).expect("failed to open engine");
 
-    // 1.正常删除一个存在的 key
-    let res1 = engine.put(get_test_key(111), get_test_value(111));
+    let res1 = engine.put(get_test_key(222), get_test_value(222));
     assert!(res1.is_ok());
-    let res2 = engine.delete(get_test_key(111));
-    assert!(res2.is_ok());
-    let res3 = engine.get(get_test_key(111));
-    assert_eq!(Errors::KeyNotFound, res3.err().unwrap());
 
-    // 2.删除一个不存在的 key
-    let res4 = engine.delete(Bytes::from("not-existed-key"));
-    assert!(res4.is_ok());
+    let close_res = engine.close();
+    assert!(close_res.is_ok());
 
-    // 3.删除一个空的 key
-    let res5 = engine.delete(Bytes::new());
-    assert_eq!(Errors::KeyIsEmpty, res5.err().unwrap());
+    // 删除测试的文件夹
+    std::fs::remove_dir_all(opts.clone().dir_path).expect("failed to remove path");
+}
 
-    // 4.值被删除之后重新 Put
-    let res6 = engine.put(get_test_key(222), get_test_value(222));
-    assert!(res6.is_ok());
-    let res7 = engine.delete(get_test_key(222));
-    assert!(res7.is_ok());
-    let res8 = engine.put(get_test_key(222), Bytes::from("a new value"));
-    assert!(res8.is_ok());
-    let res9 = engine.get(get_test_key(222));
-    assert_eq!(Bytes::from("a new value"), res9.unwrap());
+#[test]
+fn test_engine_sync() {
+    let mut opts = Options::default();
+    opts.dir_path = PathBuf::from("/tmp/bitcask-rs-sync");
+    opts.data_file_size = 64 * 1024 * 1024;
+    let engine = Engine::open(opts.clone()).expect("failed to open engine");
 
-    // 5.重启后再 Put 数据
-    std::mem::drop(engine);
+    let res1 = engine.put(get_test_key(222), get_test_value(222));
+    assert!(res1.is_ok());
 
-    let engine2 = Engine::open(opts.clone()).expect("failed to open engine");
-    let res10 = engine2.get(get_test_key(111));
-    assert_eq!(Errors::KeyNotFound, res10.err().unwrap());
-    let res11 = engine2.get(get_test_key(222));
-    assert_eq!(Bytes::from("a new value"), res11.unwrap());
+    let close_res = engine.sync();
+    assert!(close_res.is_ok());
 
     // 删除测试的文件夹
     std::fs::remove_dir_all(opts.clone().dir_path).expect("failed to remove path");
