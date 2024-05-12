@@ -8,6 +8,9 @@ pub enum LogRecordType {
 
     // A log record indicating that a key has been deleted.
     DELETED = 2,
+
+    // A log record indicating that a transaction has been finished.
+    TXNFINISHED = 3,
 }
 
 impl LogRecordType {
@@ -15,6 +18,7 @@ impl LogRecordType {
         match value {
             1 => LogRecordType::NORMAL,
             2 => LogRecordType::DELETED,
+            3 => LogRecordType::TXNFINISHED,
             _ => panic!("Invalid log record type: {}", value),
         }
     }
@@ -96,6 +100,13 @@ pub struct LogRecordPos {
 pub struct ReadLogRecord {
     pub(crate) record: LogRecord,
     pub(crate) size: usize,
+}
+
+/// TransactionRecord represents a log record that is part of a transaction.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TransactionRecord {
+    pub(crate) record: LogRecord,
+    pub(crate) pos: LogRecordPos,
 }
 
 /// max_log_record_header_size returns the maximum size of a log record header.

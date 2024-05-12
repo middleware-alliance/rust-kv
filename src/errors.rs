@@ -46,6 +46,9 @@ pub enum Errors {
 
     #[error("invalid crc value, log record may be corrupted")]
     InvalidLogRecordCrc,
+
+    #[error("exceed max batch number")]
+    ExceedMaxBatchNum,
 }
 
 pub type Result<T> = std::result::Result<T, Errors>;

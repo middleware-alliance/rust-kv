@@ -21,12 +21,11 @@ pub enum IndexType {
     SkipList,
 }
 
-
 impl Default for Options {
     fn default() -> Self {
         Self {
             dir_path: std::env::temp_dir().join("bitcask-rs"),
-            data_file_size: 256 *1024 * 1024,
+            data_file_size: 256 * 1024 * 1024,
             sync_writes: false,
             index_type: IndexType::BTree,
         }
@@ -44,6 +43,21 @@ impl Default for IteratorOptions {
         Self {
             prefix: Default::default(),
             reverse: false,
+        }
+    }
+}
+
+/// Write batch options for batch writing to the database.
+pub struct WriteBatchOptions {
+    pub max_batch_num: usize, // max batch number
+    pub sync_writes: bool,  // whether every operation requires persistent synchronization
+}
+
+impl Default for WriteBatchOptions {
+    fn default() -> Self {
+        Self {
+            max_batch_num: 1000,
+            sync_writes: true,
         }
     }
 }
