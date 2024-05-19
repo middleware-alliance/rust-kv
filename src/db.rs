@@ -13,7 +13,7 @@ use std::ptr::read;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use crate::data::data_file::{DataFile, DATA_FILE_NAME_SUFFIX};
+use crate::data::data_file::{DataFile, DATA_FILE_NAME_SUFFIX, MERGE_FINISHED_FILE_NAME};
 use crate::errors::{Errors, Result};
 use crate::index;
 use crate::options::Options;
@@ -35,6 +35,8 @@ pub struct Engine {
     pub(crate) batch_commit_lock: Mutex<()>,
     // sequence number for batch commit operations
     pub(crate) seq_no: Arc<AtomicUsize>,
+    // merging lock for merging operations to avoid race conditions
+    pub(crate) merging_lock: Mutex<()>,
 }
 
 impl Engine {
@@ -55,6 +57,9 @@ impl Engine {
                 return Err(Errors::FailedToCreateDatabaseDir);
             }
         }
+
+        // load merge data files from the directory
+        Self::load_merge_files(dir_path.clone())?;
 
         // load the data files from the directory
         let mut data_files = load_data_files(dir_path.clone())?;
@@ -91,7 +96,11 @@ impl Engine {
             load_data_file_ids: file_ids,
             batch_commit_lock: Mutex::new(()),
             seq_no: Arc::new(AtomicUsize::new(1)),
+            merging_lock: Mutex::new(()),
         };
+
+        // load the memory index from the hint file
+        engine.load_index_from_hint_file()?;
 
         // load the memory index from the data files
         let current_seq_no = engine.load_index_from_data_files()?;
@@ -327,6 +336,20 @@ impl Engine {
             return Ok(current_seq_no);
         }
 
+        // check if there is a merge in progress
+        // get file id who has not participated in the merge recently
+        let mut has_merge = false;
+        let mut non_merge_fid = 0;
+        let merge_fin_file = self.options.dir_path.join(MERGE_FINISHED_FILE_NAME);
+        if merge_fin_file.is_file() {
+            let merge_fin_file = DataFile::new_merge_fin_file(self.options.dir_path.clone())?;
+            let merge_fin_record = merge_fin_file.read_log_record(0)?;
+            let v  = String::from_utf8(merge_fin_record.record.value).unwrap();
+
+            non_merge_fid = v.parse::<u32>().unwrap();
+            has_merge = true;
+        }
+
         // pending data files to load
         let mut transaction_records = HashMap::new();
 
@@ -335,8 +358,12 @@ impl Engine {
 
         // iterate over the data files and load the index
         for (idx, file_id) in self.load_data_file_ids.iter().enumerate() {
-            let mut offset = 0;
+            // If it is smaller than the file id that has not recently participated in the merge, the index has been loaded from the hint file.
+            if has_merge && *file_id < non_merge_fid {
+                continue;
+            }
 
+            let mut offset = 0;
             loop {
                 let log_record_res = match *file_id == active_file.get_file_id() {
                     true => active_file.read_log_record(offset),

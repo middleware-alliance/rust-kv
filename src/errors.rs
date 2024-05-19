@@ -49,6 +49,9 @@ pub enum Errors {
 
     #[error("exceed max batch number")]
     ExceedMaxBatchNum,
+
+    #[error("merge is in progress, try again later")]
+    MergeInProgress,
 }
 
 pub type Result<T> = std::result::Result<T, Errors>;

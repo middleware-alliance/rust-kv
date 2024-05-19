@@ -5,14 +5,14 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 use prost::{decode_length_delimiter, length_delimiter_len};
 
-use crate::data::log_record::{
-    max_log_record_header_size, LogRecord, LogRecordType, ReadLogRecord,
-};
+use crate::data::log_record::{max_log_record_header_size, LogRecord, LogRecordType, ReadLogRecord, LogRecordPos};
 use crate::errors::{Errors, Result};
 use crate::fio;
 use crate::fio::new_io_manager;
 
 pub const DATA_FILE_NAME_SUFFIX: &str = ".data";
+pub const HINT_FILE_NAME: &str = "hint-index";
+pub const MERGE_FINISHED_FILE_NAME: &str = "merge-finished";
 
 pub struct DataFile {
     file_id: Arc<RwLock<u32>>, // file_id is a shared variable that is accessed by multiple threads
@@ -30,6 +30,30 @@ impl DataFile {
 
         Ok(DataFile {
             file_id: Arc::new(RwLock::new(file_id)),
+            write_off: Arc::new(RwLock::new(0)),
+            io_manager: Box::new(io_manager),
+        })
+    }
+
+    /// Creates a new hint file in the given directory.
+    pub fn new_hint_file(dir_path: PathBuf) -> Result<DataFile> {
+        let file_name = dir_path.join(HINT_FILE_NAME);
+        let io_manager = new_io_manager(file_name)?;
+
+        Ok(DataFile {
+            file_id: Arc::new(RwLock::new(0)),
+            write_off: Arc::new(RwLock::new(0)),
+            io_manager: Box::new(io_manager),
+        })
+    }
+
+    /// Creates a new merge finished file in the given directory.
+    pub fn new_merge_fin_file(dir_path: PathBuf) -> Result<DataFile> {
+        let file_name = dir_path.join(MERGE_FINISHED_FILE_NAME);
+        let io_manager = new_io_manager(file_name)?;
+
+        Ok(DataFile {
+            file_id: Arc::new(RwLock::new(0)),
             write_off: Arc::new(RwLock::new(0)),
             io_manager: Box::new(io_manager),
         })
@@ -108,13 +132,25 @@ impl DataFile {
         Ok(n_bytes)
     }
 
+    /// Writes a hint index record to the hint file.
+    pub fn write_hint_record(&self, key: Vec<u8>, pos: LogRecordPos) -> Result<()> {
+        let hint_record = LogRecord {
+            key,
+            value: pos.encode(),
+            rec_type: LogRecordType::NORMAL,
+        };
+        let enc_record = hint_record.encode();
+        self.write(&enc_record)?;
+        Ok(())
+    }
+
     pub fn sync(&self) -> Result<()> {
         self.io_manager.sync()
     }
 }
 
 /// Returns the path of the data file with the given file_id in the given directory.
-fn get_data_file_path(dir_path: PathBuf, file_id: u32) -> PathBuf {
+pub fn get_data_file_path(dir_path: PathBuf, file_id: u32) -> PathBuf {
     let name = std::format!("{:09}", file_id) + DATA_FILE_NAME_SUFFIX;
     dir_path.join(name)
     //let file_name = dir_path.to_path_buf().join(v);

@@ -9,3 +9,4 @@ mod util;
 mod db_tests;
 mod iterator;
 mod batch;
+mod merge;
