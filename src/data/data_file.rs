@@ -13,6 +13,7 @@ use crate::fio::new_io_manager;
 pub const DATA_FILE_NAME_SUFFIX: &str = ".data";
 pub const HINT_FILE_NAME: &str = "hint-index";
 pub const MERGE_FINISHED_FILE_NAME: &str = "merge-finished";
+pub const SEQ_NO_FILE_NAME: &str = "seq-no";
 
 pub struct DataFile {
     file_id: Arc<RwLock<u32>>, // file_id is a shared variable that is accessed by multiple threads
@@ -26,37 +27,53 @@ impl DataFile {
         // Create the data file if it doesn't exist
         let file_name = get_data_file_path(dir_path, file_id);
         // init io manager
-        let io_manager = new_io_manager(file_name)?;
+        let io_manager = new_io_manager(file_name);
 
         Ok(DataFile {
             file_id: Arc::new(RwLock::new(file_id)),
             write_off: Arc::new(RwLock::new(0)),
-            io_manager: Box::new(io_manager),
+            io_manager,
         })
     }
 
     /// Creates a new hint file in the given directory.
     pub fn new_hint_file(dir_path: PathBuf) -> Result<DataFile> {
         let file_name = dir_path.join(HINT_FILE_NAME);
-        let io_manager = new_io_manager(file_name)?;
+        let io_manager = new_io_manager(file_name);
 
         Ok(DataFile {
             file_id: Arc::new(RwLock::new(0)),
             write_off: Arc::new(RwLock::new(0)),
-            io_manager: Box::new(io_manager),
+            io_manager,
         })
     }
 
     /// Creates a new merge finished file in the given directory.
     pub fn new_merge_fin_file(dir_path: PathBuf) -> Result<DataFile> {
         let file_name = dir_path.join(MERGE_FINISHED_FILE_NAME);
-        let io_manager = new_io_manager(file_name)?;
+        let io_manager = new_io_manager(file_name);
 
         Ok(DataFile {
             file_id: Arc::new(RwLock::new(0)),
             write_off: Arc::new(RwLock::new(0)),
-            io_manager: Box::new(io_manager),
+            io_manager,
         })
+    }
+
+    /// Creates a new seq no file in the given directory.
+    pub fn new_seq_no_file(dir_path: PathBuf) -> Result<DataFile> {
+        let file_name = dir_path.join(SEQ_NO_FILE_NAME);
+        let io_manager = new_io_manager(file_name);
+
+        Ok(DataFile {
+            file_id: Arc::new(RwLock::new(0)),
+            write_off: Arc::new(RwLock::new(0)),
+            io_manager,
+        })
+    }
+
+    pub fn file_size(&self) -> u64 {
+        self.io_manager.size()
     }
 
     pub fn get_write_off(&self) -> u64 {

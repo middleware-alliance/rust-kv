@@ -15,9 +15,11 @@ pub trait IOManager: Send + Sync {
     /// Synchronize the device's internal cache with the underlying storage.
     /// This ensures that data written to the device is immediately available for reading.
     fn sync(&self) -> Result<()>;
+    /// Get the size of the device in bytes.
+    fn size(&self) -> u64;
 }
 
 /// Create a new IOManager for the given file name.
-pub fn new_io_manager(file_name: PathBuf) -> Result<impl IOManager> {
-    FileIO::new(file_name)
+pub fn new_io_manager(file_name: PathBuf) -> Box<dyn IOManager> {
+    Box::new(FileIO::new(file_name).unwrap())
 }

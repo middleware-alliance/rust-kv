@@ -13,10 +13,10 @@ use std::ptr::read;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use crate::data::data_file::{DataFile, DATA_FILE_NAME_SUFFIX, MERGE_FINISHED_FILE_NAME};
+use crate::data::data_file::{DataFile, DATA_FILE_NAME_SUFFIX, MERGE_FINISHED_FILE_NAME, SEQ_NO_FILE_NAME};
 use crate::errors::{Errors, Result};
 use crate::index;
-use crate::options::Options;
+use crate::options::{IndexType, Options};
 
 const INITIAL_FILE_ID: u32 = 0;
 
@@ -37,6 +37,10 @@ pub struct Engine {
     pub(crate) seq_no: Arc<AtomicUsize>,
     // merging lock for merging operations to avoid race conditions
     pub(crate) merging_lock: Mutex<()>,
+    // whether the seq file exists
+    pub(crate) seq_file_exists: bool,
+    // whether the database is initial
+    pub(crate) is_initial: bool,
 }
 
 impl Engine {
@@ -47,15 +51,22 @@ impl Engine {
             return Err(e);
         }
 
+        let mut is_initial = false;
         // create the directory if it does not exist
         let opts = options.clone();
 
         let dir_path = opts.dir_path.clone();
         if !dir_path.is_dir() {
+            is_initial = true;
             if let Err(e) = fs::create_dir_all(dir_path.as_path()) {
                 warn!("create directory failed: {}", e);
                 return Err(Errors::FailedToCreateDatabaseDir);
             }
+        }
+
+        let entries = fs::read_dir(dir_path.clone()).unwrap();
+        if entries.count() == 0 {
+            is_initial = true;
         }
 
         // load merge data files from the directory
@@ -88,26 +99,43 @@ impl Engine {
         };
 
         // construct the engine instance
-        let engine = Self {
+        let mut engine = Self {
             options: Arc::new(opts),
             active_file: Arc::new(RwLock::new(active_file)),
             older_files: Arc::new(RwLock::new(older_files)),
-            index: Box::new(index::new_indexer(options.index_type)),
+            index: index::new_indexer(options.index_type, options.dir_path),
             load_data_file_ids: file_ids,
             batch_commit_lock: Mutex::new(()),
             seq_no: Arc::new(AtomicUsize::new(1)),
             merging_lock: Mutex::new(()),
+            seq_file_exists: false,
+            is_initial,
         };
 
-        // load the memory index from the hint file
-        engine.load_index_from_hint_file()?;
+        if engine.options.index_type != IndexType::BPlusTree {
+            // load the memory index from the hint file
+            engine.load_index_from_hint_file()?;
 
-        // load the memory index from the data files
-        let current_seq_no = engine.load_index_from_data_files()?;
+            // load the memory index from the data files
+            let current_seq_no = engine.load_index_from_data_files()?;
 
-        // update the sequence number for batch commit operations
-        if current_seq_no > 0 {
-            engine.seq_no.store(current_seq_no + 1, Ordering::SeqCst);
+            // update the sequence number for batch commit operations
+            if current_seq_no > 0 {
+                engine.seq_no.store(current_seq_no + 1, Ordering::SeqCst);
+            }
+        }
+
+        if engine.options.index_type == IndexType::BPlusTree {
+            // load the sequence number from the sequence file
+            let (exists, seq_no) = engine.load_seq_no();
+            if exists {
+                engine.seq_no.store(seq_no, Ordering::SeqCst);
+                engine.seq_file_exists = exists;
+            }
+
+            // set the write offset for the active data file
+            let active_file = engine.active_file.write();
+            active_file.set_write_off(active_file.file_size());
         }
 
         Ok(engine)
@@ -467,6 +495,28 @@ impl Engine {
         let active_file = self.active_file.read();
         active_file.sync()
     }
+
+    // load the sequence number from the seq no file
+    fn load_seq_no(&self) -> (bool, usize) {
+        let file_name = self.options.dir_path.join(SEQ_NO_FILE_NAME);
+        if !file_name.is_file() {
+            return (false, 0);
+        }
+
+        let seq_no_file = DataFile::new_seq_no_file(self.options.dir_path.clone()).unwrap();
+        let record = match seq_no_file.read_log_record(0) {
+            Ok(res) => res.record,
+            Err(e) => panic!("failed to read seq no: {}", e),
+        };
+        let v = String::from_utf8(record.value).unwrap();
+        let seq_no = v.parse::<usize>().unwrap();
+
+        // remove the seq no file
+        fs::remove_file(file_name).unwrap();
+
+        (true, seq_no)
+    }
+
 }
 
 /// check the options for errors

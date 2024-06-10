@@ -12,13 +12,16 @@ pub struct Options {
     pub index_type: IndexType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IndexType {
     // BTree index
     BTree,
 
     // skip  table index
     SkipList,
+
+    // BPlusTree index
+    BPlusTree,
 }
 
 impl Default for Options {

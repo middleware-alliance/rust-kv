@@ -80,6 +80,12 @@ impl IOManager for FileIO {
             }
         }
     }
+
+    fn size(&self) -> u64 {
+        let read_guard = self.fd.read();
+        let metadata = read_guard.metadata().unwrap();
+        metadata.len()
+    }
 }
 
 /// Test the `FileIO` implementation.
@@ -167,5 +173,25 @@ mod tests {
 
         let result = fs::remove_file(path);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_file_io_size() {
+        let path = PathBuf::from("/tmp/test_file_io_size.txt");
+        let fio_res = FileIO::new(path.clone());
+        assert!(fio_res.is_ok());
+        let fio = fio_res.ok().unwrap();
+
+        let size1 = fio.size();
+        assert_eq!(size1, 0);
+
+        let res2 = fio.write("key-b".as_bytes());
+        assert!(res2.is_ok());
+
+        let size2 = fio.size();
+        assert_eq!(size2, 5);
+
+        let res3 = fs::remove_file(path.clone());
+        assert!(res3.is_ok());
     }
 }

@@ -1,6 +1,8 @@
 pub mod btree;
 mod skiplist;
+mod bptree;
 
+use std::path::PathBuf;
 use crate::data::log_record::LogRecordPos;
 use crate::errors::Result;
 use crate::options::{IndexType, IteratorOptions};
@@ -21,11 +23,12 @@ pub trait Indexer: Send + Sync {
     fn iterator(&self, options: IteratorOptions) -> Box<dyn IndexIterator>;
 }
 
-pub fn new_indexer(index_type: IndexType) -> impl Indexer {
+// new_indexer creates a new indexer based on the given index type.
+pub fn new_indexer(index_type: IndexType, dir_path: PathBuf) -> Box<dyn Indexer> {
     match index_type {
-        IndexType::BTree => btree::BTree::new(),
-        IndexType::SkipList => skiplist::SkipList::new(),
-        _ => panic!("Unsupported index type"),
+        IndexType::BTree => Box::new(btree::BTree::new()),
+        IndexType::SkipList => Box::new(skiplist::SkipList::new()),
+        IndexType::BPlusTree => Box::new(bptree::BPlusTree::new(dir_path)),
     }
 }
 
