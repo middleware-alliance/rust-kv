@@ -70,7 +70,7 @@ impl Engine {
                     if index_pos.file_id == data_file.get_file_id() && index_pos.offset == offset {
                         // remove transaction id
                         log_record.key =
-                            log_record_key_with_seq_no(original_key, NON_TRANSACTION_SEQ_NO)?;
+                            log_record_key_with_seq_no(original_key.clone(), NON_TRANSACTION_SEQ_NO);
                         let log_record_pos = merge_db.append_log_record(&mut log_record)?;
                         // write hint index
                         hint_file.write_hint_record(original_key.clone(), log_record_pos)?;
@@ -163,6 +163,7 @@ impl Engine {
             self.index.put(log_record.key, log_record_pos);
             offset += size as u64;
         }
+        Ok(())
     }
 
     /// load merge files directly from disk

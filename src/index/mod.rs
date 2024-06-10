@@ -1,9 +1,10 @@
 pub mod btree;
+mod skiplist;
 
-use crate::errors::Result;
-use bytes::Bytes;
 use crate::data::log_record::LogRecordPos;
+use crate::errors::Result;
 use crate::options::{IndexType, IteratorOptions};
+use bytes::Bytes;
 
 // Indexer is a trait that defines the interface for an index.
 // It provides methods for inserting, retrieving, and deleting keys and their corresponding positions in the log.
@@ -23,7 +24,7 @@ pub trait Indexer: Send + Sync {
 pub fn new_indexer(index_type: IndexType) -> impl Indexer {
     match index_type {
         IndexType::BTree => btree::BTree::new(),
-        IndexType::SkipList => todo!(),
+        IndexType::SkipList => skiplist::SkipList::new(),
         _ => panic!("Unsupported index type"),
     }
 }
